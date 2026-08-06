@@ -2,8 +2,8 @@ name: Keepalive
 
 on:
   schedule:
-    # 每周一凌晨 2:00 运行
-    - cron: '0 2 * * 1'
+    # 每周一凌晨 2:20 运行
+    - cron: '20 2 * * 1'
   workflow_dispatch:
 
 jobs:
