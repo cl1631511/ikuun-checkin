@@ -1,81 +1,46 @@
-name: 'kunkun Checkin Action'
+- name: Login and sign in
+  env:
+    EMAIL: ${{ secrets.EMAIL }}
+    PASSWORD: ${{ secrets.PASSWORD }}
+    BARK_KEY: ${{ secrets.BARK_KEY }}
+  run: |
+    # 执行登录
+    xvfb-run --auto-servernum node login.js
 
-on:
-  schedule:
-    - cron: '0 16 * * *'
-  workflow_dispatch:
+    # 签到并解析结果
+    response=$(curl -b cookie.txt -s -X POST "$DOMAIN/user/checkin")
+    echo "原始响应: $response"
 
-jobs:
-  checking:
-    runs-on: ubuntu-latest
-    env:
-      DOMAIN: https://ikuuu.fyi
+    # 用 jq 解析 JSON
+    ret=$(echo "$response" | jq -r '.ret')
+    msg=$(echo "$response" | jq -r '.msg')
 
-    steps:
-    - name: Setup timezone
-      uses: zcong1993/setup-timezone@master
-      with:
-        timezone: Asia/Shanghai
+    echo "ret: $ret, msg: $msg"
 
-    - name: Checkout code
-      uses: actions/checkout@master
+    # 判断签到结果（使用 %0A 换行）
+    if [ "$ret" = "0" ]; then
+      TITLE=" iKuuu签到成功"
+      BODY="签到结果: ${msg}%0A时间: $(date '+%Y-%m-%d %H:%M:%S')"
+      LEVEL=""
+    else
+      TITLE=" iKuuu签到失败"
+      BODY="签到结果: ${msg}%0A时间: $(date '+%Y-%m-%d %H:%M:%S')%0A请及时检查！"
+      LEVEL="&level=critical&volume=0"
+    fi
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22'
-
-    - name: Install Playwright
-      run: |
-        npm install playwright-extra puppeteer-extra-plugin-stealth playwright
-        npx playwright install chromium --with-deps
-
-    - name: Install jq
-      run: sudo apt-get install -y jq
-
-    - name: Login and sign in
-      env:
-        EMAIL: ${{ secrets.EMAIL }}
-        PASSWORD: ${{ secrets.PASSWORD }}
-        BARK_KEY: ${{ secrets.BARK_KEY }}
-      run: |
-        # 执行登录
-        xvfb-run --auto-servernum node login.js
-
-        # 签到并解析结果
-        response=$(curl -b cookie.txt -s -X POST "$DOMAIN/user/checkin")
-        echo "原始响应: $response"
-
-        # 用 jq 解析 JSON
-        ret=$(echo "$response" | jq -r '.ret')
-        msg=$(echo "$response" | jq -r '.msg')
-
-        echo "ret: $ret, msg: $msg"
-
-        # 判断签到结果
-        if [ "$ret" = "0" ]; then
-          TITLE=" iKuuu签到成功"
-          BODY="签到结果: ${msg}，时间: $(date '+%Y-%m-%d %H:%M:%S')"
-          LEVEL=""
-        else
-          TITLE=" iKuuu签到失败"
-          BODY="签到结果: ${msg}，时间: $(date '+%Y-%m-%d %H:%M:%S')，请及时检查！"
-          LEVEL="&level=critical&volume=0"
-        fi
-
-        # 发送 Bark 推送
-        if [ -n "$BARK_KEY" ]; then
-          echo " 发送 Bark 推送..."
-          curl -s -G "https://api.day.app/${BARK_KEY}" \
-            --data-urlencode "title=${TITLE}" \
-            --data-urlencode "body=${BODY}" \
-            --data-urlencode "sound=minimal" \
-            --data-urlencode "group=ikuun-checkin" \
-            ${LEVEL} \
-            --connect-timeout 10 \
-            --max-time 30
-          echo ""
-          echo " Bark 推送完成"
-        else
-          echo " 未设置 BARK_KEY，跳过 Bark 推送"
-        fi
+    # 发送 Bark 推送
+    if [ -n "$BARK_KEY" ]; then
+      echo " 发送 Bark 推送..."
+      curl -s -G "https://api.day.app/${BARK_KEY}" \
+        --data-urlencode "title=${TITLE}" \
+        --data-urlencode "body=${BODY}" \
+        --data-urlencode "sound=minimal" \
+        --data-urlencode "group=ikuun-checkin" \
+        ${LEVEL} \
+        --connect-timeout 10 \
+        --max-time 30
+      echo ""
+      echo " Bark 推送完成"
+    else
+      echo " 未设置 BARK_KEY，跳过 Bark 推送"
+    fi
