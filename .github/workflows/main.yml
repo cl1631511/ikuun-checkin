@@ -2,7 +2,7 @@ name: 'kunkun Checkin Action'
 
 on:
   schedule:
-    - cron: '0 16 * * *'
+    - cron: '16 16 * * *'
   workflow_dispatch:
 
 jobs:
