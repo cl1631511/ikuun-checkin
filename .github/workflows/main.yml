@@ -54,18 +54,18 @@ jobs:
 
         # 判断签到结果
         if [ "$ret" = "0" ]; then
-          TITLE="✅ iKuuu签到成功"
-          BODY="签到结果: ${msg}\n时间: $(date '+%Y-%m-%d %H:%M:%S')"
+          TITLE=" iKuuu签到成功"
+          BODY="签到结果: ${msg}，时间: $(date '+%Y-%m-%d %H:%M:%S')"
           LEVEL=""
         else
-          TITLE="❌ iKuuu签到失败"
-          BODY="签到结果: ${msg}\n时间: $(date '+%Y-%m-%d %H:%M:%S')\n请及时检查！"
+          TITLE=" iKuuu签到失败"
+          BODY="签到结果: ${msg}，时间: $(date '+%Y-%m-%d %H:%M:%S')，请及时检查！"
           LEVEL="&level=critical&volume=0"
         fi
 
         # 发送 Bark 推送
         if [ -n "$BARK_KEY" ]; then
-          echo "📤 发送 Bark 推送..."
+          echo " 发送 Bark 推送..."
           curl -s -G "https://api.day.app/${BARK_KEY}" \
             --data-urlencode "title=${TITLE}" \
             --data-urlencode "body=${BODY}" \
@@ -75,7 +75,7 @@ jobs:
             --connect-timeout 10 \
             --max-time 30
           echo ""
-          echo "✅ Bark 推送完成"
+          echo " Bark 推送完成"
         else
-          echo "⏭️ 未设置 BARK_KEY，跳过 Bark 推送"
+          echo " 未设置 BARK_KEY，跳过 Bark 推送"
         fi
