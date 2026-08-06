@@ -9,7 +9,7 @@ jobs:
   checking:
     runs-on: ubuntu-latest
     env:
-      DOMAIN: https://ikuuu.fy
+      DOMAIN: https://ikuuu.fyi
 
     steps:
       - name: Setup timezone
@@ -70,11 +70,11 @@ jobs:
             msg="${{ steps.signin.outputs.msg }}"
 
             if [ "$ret" = "0" ]; then
-              TITLE="iKuuu签到成功"
+              TITLE="✅ iKuuu签到成功"
               BODY="${msg} $(date '+%m-%d %H:%M')"
               EXTRA=""
             else
-              TITLE="iKuuu签到失败"
+              TITLE="❌ iKuuu签到失败"
               BODY="${msg} 请及时检查！"
               EXTRA="?level=critical&volume=0"
             fi
