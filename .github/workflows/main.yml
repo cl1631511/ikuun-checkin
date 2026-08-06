@@ -9,7 +9,7 @@ jobs:
   checking:
     runs-on: ubuntu-latest
     env:
-      DOMAIN: https://ikuuu.fyi
+      DOMAIN: https://ikuuu.foo
 
     steps:
       - name: Setup timezone
