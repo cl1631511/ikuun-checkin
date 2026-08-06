@@ -35,14 +35,13 @@ jobs:
 
       - name: Login and sign in
         id: signin
-        continue-on-error: true  # 即使失败也继续执行后续步骤
+        continue-on-error: true
         env:
           EMAIL: ${{ secrets.EMAIL }}
           PASSWORD: ${{ secrets.PASSWORD }}
         run: |
           xvfb-run --auto-servernum node login.js
 
-          # 签到并解析结果
           response=$(curl -b cookie.txt -s -X POST "$DOMAIN/user/checkin")
           echo "原始响应: $response"
 
@@ -54,35 +53,32 @@ jobs:
           echo "response=$response" >> $GITHUB_OUTPUT
 
       - name: Bark Notification
-        if: always()  # 无论成功还是失败都执行
+        if: always()
         env:
           BARK_KEY: ${{ secrets.BARK_KEY }}
         run: |
-          # 检查 login.js 是否执行成功
           if [ "${{ steps.signin.outcome }}" = "failure" ]; then
             TITLE="❌ iKuuu签到失败"
-            BODY=$'登录失败，请检查以下问题：\n- 域名是否正确？\n- 账号密码是否有效？\n- 极验验证码是否通过？\n\n时间: '"$(date '+%Y-%m-%d %H:%M:%S')"
-            EXTRA="--data-urlencode level=critical --data-urlencode volume=0"
+            BODY="登录失败，请检查以下问题：%0A- 域名是否正确？%0A- 账号密码是否有效？%0A- 极验验证码是否通过？%0A%0A时间: $(date '+%Y-%m-%d %H:%M:%S')"
+            EXTRA="&level=critical&volume=0"
           else
-            # 获取签到结果
             ret="${{ steps.signin.outputs.ret }}"
             msg="${{ steps.signin.outputs.msg }}"
 
             if [ "$ret" = "0" ]; then
               TITLE="✅ iKuuu签到成功"
-              BODY=$'签到结果: '"${msg}"$'\n时间: '"$(date '+%Y-%m-%d %H:%M:%S')"
+              BODY="签到结果: ${msg}%0A时间: $(date '+%Y-%m-%d %H:%M:%S')"
               EXTRA=""
             else
               TITLE="❌ iKuuu签到失败"
-              BODY=$'签到结果: '"${msg}"$'\n时间: '"$(date '+%Y-%m-%d %H:%M:%S')"$'\n请及时检查！"
-              EXTRA="--data-urlencode level=critical --data-urlencode volume=0"
+              BODY="签到结果: ${msg}%0A时间: $(date '+%Y-%m-%d %H:%M:%S')%0A请及时检查！"
+              EXTRA="&level=critical&volume=0"
             fi
           fi
 
-          # 发送 Bark 推送
           if [ -n "$BARK_KEY" ]; then
             echo "📤 发送 Bark 推送..."
-            eval curl -s -G "https://api.day.app/${BARK_KEY}" \
+            curl -s -G "https://api.day.app/${BARK_KEY}" \
               --data-urlencode "title=${TITLE}" \
               --data-urlencode "body=${BODY}" \
               --data-urlencode "sound=minimal" \
