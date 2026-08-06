@@ -1,114 +1,71 @@
 name: 'kunkun Checkin Action'
 
-on: 
-  release:
-    types: [published]
-  push:
-    tags:
-    - 'v*'
+on:
   schedule:
-    - cron: '0 16 * * *'
-  watch:
-    types: [started]
-  workflow_dispatch:
-   
+    - cron: '0 16 * * *'   # 每天 16:00 UTC = 北京时间 0:00
+  workflow_dispatch:        # 保留手动触发
+
 jobs:
   checking:
     runs-on: ubuntu-latest
     env:
       DOMAIN: https://ikuuu.fyi
-    if: github.event.repository.owner.id == github.event.sender.id || github.event_name == 'schedule'
+
     steps:
     - name: Setup timezone
       uses: zcong1993/setup-timezone@master
       with:
-        timezone: Asia/Shanghai          
-    - name: Get log
+        timezone: Asia/Shanghai
+
+    - name: Checkout code
       uses: actions/checkout@master
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '22'
+
     - name: Install Playwright
       run: |
         npm install playwright-extra puppeteer-extra-plugin-stealth playwright
         npx playwright install chromium --with-deps
-    - name: login in APi
+
+    - name: Login and sign in
       env:
         EMAIL: ${{ secrets.EMAIL }}
         PASSWORD: ${{ secrets.PASSWORD }}
         BARK_KEY: ${{ secrets.BARK_KEY }}
-      run: xvfb-run --auto-servernum node login.js
-    - name: Chick in Api
-      env:
-        SENDKEY: ${{ secrets.SENDKEY }}
-      run: | 
-        dateTime=`date +%Y-%m-%d\ %H:%M:%S`
-        response=$(curl -b cookie.txt -X POST "$DOMAIN/user/checkin")
-        if [ -n "$SENDKEY" ]; then
-          curl -X POST "https://sctapi.ftqq.com/${SENDKEY}.send" -d "title=${response}&desp=${response}" 
-        fi
-        echo "$dateTime - $(echo -e $response)" >> run.log
-        tail run.log
-    - name: Bark Notification
-      if: always()
-      env:
-        BARK_KEY: ${{ secrets.BARK_KEY }}
       run: |
-        if [ -z "$BARK_KEY" ]; then
+        # 执行登录 + 签到
+        xvfb-run --auto-servernum node login.js
+
+        # 用 curl 再签一次，确保拿到结果
+        response=$(curl -b cookie.txt -s -X POST "$DOMAIN/user/checkin")
+        echo "$response" > run.log
+
+        # 解析签到结果
+        if echo "$response" | grep -qE "成功|已经签到|ret.*0"; then
+          TITLE=" iKuuu签到成功"
+          BODY="签到结果: ${response}\n时间: $(date '+%Y-%m-%d %H:%M:%S')"
+          LEVEL=""
+        else
+          TITLE=" iKuuu签到失败"
+          BODY="签到结果: ${response}\n时间: $(date '+%Y-%m-%d %H:%M:%S')\n请及时检查！"
+          LEVEL="&level=critical&volume=0"
+        fi
+
+        # 发送 Bark 推送
+        if [ -n "$BARK_KEY" ]; then
+          echo " 发送 Bark 推送..."
+          curl -s -G "https://api.day.app/${BARK_KEY}" \
+            --data-urlencode "title=${TITLE}" \
+            --data-urlencode "body=${BODY}" \
+            --data-urlencode "sound=minimal" \
+            --data-urlencode "group=ikuun-checkin" \
+            ${LEVEL} \
+            --connect-timeout 10 \
+            --max-time 30
+          echo " Bark 推送完成"
+        else
           echo " 未设置 BARK_KEY，跳过 Bark 推送"
-          exit 0
         fi
-        
-        # 从 run.log 中提取签到结果
-        if [ -f run.log ]; then
-          RESULT=$(tail -1 run.log | grep -o '".*"' | sed 's/"//g' | head -1)
-          if [ -z "$RESULT" ]; then
-            RESULT="签到完成，请查看日志"
-          fi
-        else
-          RESULT="签到完成，但未找到日志文件"
-        fi
-        
-        # 判断签到是否成功
-        if echo "$RESULT" | grep -qE "成功|已经签到|ret.*0"; then
-          TITLE=" 爱哭签签到成功"
-          BODY="签到结果: ${RESULT} | 时间: $(date '+%Y-%m-%d %H:%M:%S')"
-          echo " 发送普通推送..."
-          curl -G "https://api.day.app/${BARK_KEY}" \
-            --data-urlencode "title=${TITLE}" \
-            --data-urlencode "body=${BODY}" \
-            --data-urlencode "sound=minimal" \
-            --data-urlencode "group=ikuun-checkin" \
-            --connect-timeout 10 \
-            --max-time 30
-        else
-          TITLE=" 爱哭签签到失败"
-          BODY="签到结果: ${RESULT} | 时间: $(date '+%Y-%m-%d %H:%M:%S') | 请及时检查！"
-          echo " 发送紧急推送 (critical, 静音)..."
-          curl -G "https://api.day.app/${BARK_KEY}" \
-            --data-urlencode "title=${TITLE}" \
-            --data-urlencode "body=${BODY}" \
-            --data-urlencode "sound=minimal" \
-            --data-urlencode "group=ikuun-checkin" \
-            --data-urlencode "level=critical" \
-            --data-urlencode "volume=0" \
-            --connect-timeout 10 \
-            --max-time 30
-        fi
-        echo ""
-        echo " Bark 推送完成"
-    - name: Commit
-      env:
-       NAME: ikuuu
-       EMAIL: 1015350043@qq.com
-      run: |
-        git config --global user.name "$NAME"
-        git config --global user.email "$EMAIL"
-        git add .
-        git commit -m "update log" -a || echo "无变更需要提交"
-    - name: Push log
-      uses: ad-m/github-push-action@master
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        branch: main
