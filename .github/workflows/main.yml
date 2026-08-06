@@ -50,40 +50,43 @@ jobs:
 
           echo "ret=$ret" >> $GITHUB_OUTPUT
           echo "msg=$msg" >> $GITHUB_OUTPUT
-          echo "response=$response" >> $GITHUB_OUTPUT
 
       - name: Bark Notification
         if: always()
         env:
           BARK_KEY: ${{ secrets.BARK_KEY }}
         run: |
+          # URL 编码函数
+          urlencode() {
+            echo "$1" | sed 's/ /%20/g;s/！/%EF%BC%81/g;s/？/%EF%BC%9F/g;s/，/%EF%BC%8C/g;s/：/%EF%BC%9A/g;s/；/%EF%BC%9B/g;s/“/%E2%80%9C/g;s/”/%E2%80%9D/g'
+          }
+
           if [ "${{ steps.signin.outcome }}" = "failure" ]; then
-            TITLE="❌ iKuuu签到失败"
-            BODY="登录失败，请检查以下问题：%0A- 域名是否正确？%0A- 账号密码是否有效？%0A- 极验验证码是否通过？%0A%0A时间: $(date '+%Y-%m-%d %H:%M:%S')"
-            EXTRA="&level=critical&volume=0"
+            TITLE="iKuuu签到失败"
+            BODY="登录失败，请检查：域名、账号、密码、验证码"
+            EXTRA="?level=critical&volume=0"
           else
             ret="${{ steps.signin.outputs.ret }}"
             msg="${{ steps.signin.outputs.msg }}"
 
             if [ "$ret" = "0" ]; then
-              TITLE="✅ iKuuu签到成功"
-              BODY="签到结果: ${msg}%0A时间: $(date '+%Y-%m-%d %H:%M:%S')"
+              TITLE="iKuuu签到成功"
+              BODY="${msg} $(date '+%m-%d %H:%M')"
               EXTRA=""
             else
-              TITLE="❌ iKuuu签到失败"
-              BODY="签到结果: ${msg}%0A时间: $(date '+%Y-%m-%d %H:%M:%S')%0A请及时检查！"
-              EXTRA="&level=critical&volume=0"
+              TITLE="iKuuu签到失败"
+              BODY="${msg} 请及时检查！"
+              EXTRA="?level=critical&volume=0"
             fi
           fi
 
+          # URL 编码标题和内容
+          ENCODED_TITLE=$(urlencode "$TITLE")
+          ENCODED_BODY=$(urlencode "$BODY")
+
           if [ -n "$BARK_KEY" ]; then
             echo "📤 发送 Bark 推送..."
-            curl -s -G "https://api.day.app/${BARK_KEY}" \
-              --data-urlencode "title=${TITLE}" \
-              --data-urlencode "body=${BODY}" \
-              --data-urlencode "sound=minimal" \
-              --data-urlencode "group=ikuun-checkin" \
-              ${EXTRA} \
+            curl -s "https://api.day.app/${BARK_KEY}/${ENCODED_TITLE}/${ENCODED_BODY}${EXTRA}" \
               --connect-timeout 10 \
               --max-time 30
             echo ""
