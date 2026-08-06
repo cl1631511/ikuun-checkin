@@ -34,53 +34,64 @@ jobs:
         run: sudo apt-get install -y jq
 
       - name: Login and sign in
+        id: signin
+        continue-on-error: true  # 即使失败也继续执行后续步骤
         env:
           EMAIL: ${{ secrets.EMAIL }}
           PASSWORD: ${{ secrets.PASSWORD }}
-          BARK_KEY: ${{ secrets.BARK_KEY }}
         run: |
-          # 执行登录
           xvfb-run --auto-servernum node login.js
 
           # 签到并解析结果
           response=$(curl -b cookie.txt -s -X POST "$DOMAIN/user/checkin")
           echo "原始响应: $response"
 
-          # 用 jq 解析 JSON
           ret=$(echo "$response" | jq -r '.ret')
           msg=$(echo "$response" | jq -r '.msg')
 
-          echo "ret: $ret, msg: $msg"
+          echo "ret=$ret" >> $GITHUB_OUTPUT
+          echo "msg=$msg" >> $GITHUB_OUTPUT
+          echo "response=$response" >> $GITHUB_OUTPUT
 
-          # 构建 BODY
-          if [ "$ret" = "0" ]; then
-            TITLE=" iKuuu签到成功"
-            BODY=$'签到结果: '"${msg}"$'\n时间: '"$(date '+%Y-%m-%d %H:%M:%S')"
-            # 成功：构建普通推送参数
-            set -- --data-urlencode "title=${TITLE}" \
-                   --data-urlencode "body=${BODY}" \
-                   --data-urlencode "sound=minimal" \
-                   --data-urlencode "group=ikuun-checkin"
+      - name: Bark Notification
+        if: always()  # 无论成功还是失败都执行
+        env:
+          BARK_KEY: ${{ secrets.BARK_KEY }}
+        run: |
+          # 检查 login.js 是否执行成功
+          if [ "${{ steps.signin.outcome }}" = "failure" ]; then
+            TITLE="❌ iKuuu签到失败"
+            BODY=$'登录失败，请检查以下问题：\n- 域名是否正确？\n- 账号密码是否有效？\n- 极验验证码是否通过？\n\n时间: '"$(date '+%Y-%m-%d %H:%M:%S')"
+            EXTRA="--data-urlencode level=critical --data-urlencode volume=0"
           else
-            TITLE=" iKuuu签到失败"
-            BODY=$'签到结果: '"${msg}"$'\n时间: '"$(date '+%Y-%m-%d %H:%M:%S')"$'\n请及时检查！'
-            # 失败：构建紧急推送参数
-            set -- --data-urlencode "title=${TITLE}" \
-                   --data-urlencode "body=${BODY}" \
-                   --data-urlencode "sound=minimal" \
-                   --data-urlencode "group=ikuun-checkin" \
-                   --data-urlencode "level=critical" \
-                   --data-urlencode "volume=0"
+            # 获取签到结果
+            ret="${{ steps.signin.outputs.ret }}"
+            msg="${{ steps.signin.outputs.msg }}"
+
+            if [ "$ret" = "0" ]; then
+              TITLE="✅ iKuuu签到成功"
+              BODY=$'签到结果: '"${msg}"$'\n时间: '"$(date '+%Y-%m-%d %H:%M:%S')"
+              EXTRA=""
+            else
+              TITLE="❌ iKuuu签到失败"
+              BODY=$'签到结果: '"${msg}"$'\n时间: '"$(date '+%Y-%m-%d %H:%M:%S')"$'\n请及时检查！"
+              EXTRA="--data-urlencode level=critical --data-urlencode volume=0"
+            fi
           fi
 
           # 发送 Bark 推送
           if [ -n "$BARK_KEY" ]; then
-            echo " 发送 Bark 推送..."
-            curl -s -G "https://api.day.app/${BARK_KEY}" "$@" \
+            echo "📤 发送 Bark 推送..."
+            eval curl -s -G "https://api.day.app/${BARK_KEY}" \
+              --data-urlencode "title=${TITLE}" \
+              --data-urlencode "body=${BODY}" \
+              --data-urlencode "sound=minimal" \
+              --data-urlencode "group=ikuun-checkin" \
+              ${EXTRA} \
               --connect-timeout 10 \
               --max-time 30
             echo ""
-            echo " Bark 推送完成"
+            echo "✅ Bark 推送完成"
           else
-            echo " 未设置 BARK_KEY，跳过 Bark 推送"
+            echo "⏭️ 未设置 BARK_KEY，跳过 Bark 推送"
           fi
