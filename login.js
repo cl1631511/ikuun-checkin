@@ -81,16 +81,16 @@ async function tryLogin(domain, email, password, browser) {
 
         try {
             await page.waitForURL('**/user', { timeout: 15000 });
-            console.log('✅ Login successful, redirected to:', page.url());
+            console.log('✅ 登录成功！');
             return { success: true, page, domain };
         } catch (e) {
-            console.error('Login failed, current URL:', page.url());
-            if (loginResult) console.error('Login response:', JSON.stringify(loginResult));
+            console.error('登录失败，当前URL:', page.url());
+            if (loginResult) console.error('登录响应:', JSON.stringify(loginResult));
             await page.close();
             return { success: false, page: null, error: loginResult?.message || 'Login timeout' };
         }
     } catch (e) {
-        console.error(`❌ 连接 ${domain} 失败: ${e.message}`);
+        console.error(`❌ 访问 ${domain} 失败: ${e.message}`);
         await page.close();
         return { success: false, page: null, error: e.message };
     }
@@ -103,7 +103,7 @@ async function tryLogin(domain, email, password, browser) {
     const mainDomain = process.env.DOMAIN || 'https://ikuuu.fyi';
     const backupDomainsStr = process.env.BACKUP_DOMAINS || '';
 
-    // 解析备用域名（支持空格、逗号、换行分隔）
+    // 解析备用域名
     const backupList = backupDomainsStr
         .split(/[\s,，\n]+/)
         .map(d => d.trim())
@@ -134,10 +134,11 @@ async function tryLogin(domain, email, password, browser) {
         
         const result = await tryLogin(domain, email, password, browser);
         
+        // 只有登录成功才算成功
         if (result.success) {
             successDomain = result.domain;
             successPage = result.page;
-            console.log(`✅ 成功登录: ${successDomain}`);
+            console.log(`🎉 成功登录: ${successDomain}`);
             break;
         }
         
