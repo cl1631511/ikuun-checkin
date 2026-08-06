@@ -52,26 +52,27 @@ jobs:
 
           echo "ret: $ret, msg: $msg"
 
-          # 判断签到结果（使用 %0A 换行）
+          # 判断签到结果
           if [ "$ret" = "0" ]; then
             TITLE=" iKuuu签到成功"
-            BODY="签到结果: ${msg}%0A时间: $(date '+%Y-%m-%d %H:%M:%S')"
-            LEVEL=""
+            BODY=$'签到结果: '"${msg}"$'\n时间: '"$(date '+%Y-%m-%d %H:%M:%S')"
+            # 成功时不需要 extra 参数
+            EXTRA=""
           else
             TITLE=" iKuuu签到失败"
-            BODY="签到结果: ${msg}%0A时间: $(date '+%Y-%m-%d %H:%M:%S')%0A请及时检查！"
-            LEVEL="&level=critical&volume=0"
+            BODY=$'签到结果: '"${msg}"$'\n时间: '"$(date '+%Y-%m-%d %H:%M:%S')"$'\n请及时检查！'
+            EXTRA="--data-urlencode level=critical --data-urlencode volume=0"
           fi
 
           # 发送 Bark 推送
           if [ -n "$BARK_KEY" ]; then
             echo " 发送 Bark 推送..."
-            curl -s -G "https://api.day.app/${BARK_KEY}" \
+            eval curl -s -G "https://api.day.app/${BARK_KEY}" \
               --data-urlencode "title=${TITLE}" \
               --data-urlencode "body=${BODY}" \
               --data-urlencode "sound=minimal" \
               --data-urlencode "group=ikuun-checkin" \
-              ${LEVEL} \
+              ${EXTRA} \
               --connect-timeout 10 \
               --max-time 30
             echo ""
