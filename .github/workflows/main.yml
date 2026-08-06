@@ -33,26 +33,25 @@ jobs:
       run: |
         npm install playwright-extra puppeteer-extra-plugin-stealth playwright
         npx playwright install chromium --with-deps
-    - name: login in APi # 登录获取cookie + 签到 + Bark推送
+    - name: login in APi
       env:
         EMAIL: ${{ secrets.EMAIL }}
         PASSWORD: ${{ secrets.PASSWORD }}
-        BARK_KEY: ${{ secrets.BARK_KEY }}   #  新增：传递 Bark 密钥
+        BARK_KEY: ${{ secrets.BARK_KEY }}
       run: xvfb-run --auto-servernum node login.js
-    - name: Chick in Api # 签到（保留原有逻辑作为备用）
+    - name: Chick in Api
       env:
         SENDKEY: ${{ secrets.SENDKEY }}
       run: | 
         dateTime=`date +%Y-%m-%d\ %H:%M:%S`
         response=$(curl -b cookie.txt -X POST "$DOMAIN/user/checkin")
-        # 如果 SENDKEY 存在，通过 Server酱 发送通知
         if [ -n "$SENDKEY" ]; then
           curl -X POST "https://sctapi.ftqq.com/${SENDKEY}.send" -d "title=${response}&desp=${response}" 
         fi
         echo "$dateTime - $(echo -e $response)" >> run.log
         tail run.log
-    - name: Bark Notification #  新增：独立的 Bark 推送步骤（备用）
-      if: always()  # 即使前面的步骤失败也运行
+    - name: Bark Notification
+      if: always()
       env:
         BARK_KEY: ${{ secrets.BARK_KEY }}
       run: |
@@ -63,7 +62,7 @@ jobs:
         
         # 从 run.log 中提取签到结果
         if [ -f run.log ]; then
-          RESULT=$(tail -1 run.log | grep -o '".*"' | sed 's/"//g')
+          RESULT=$(tail -1 run.log | grep -o '".*"' | sed 's/"//g' | head -1)
           if [ -z "$RESULT" ]; then
             RESULT="签到完成，请查看日志"
           fi
@@ -71,25 +70,35 @@ jobs:
           RESULT="签到完成，但未找到日志文件"
         fi
         
-        # 判断签到是否成功（包含"成功"或"已经签到"关键词）
+        # 判断签到是否成功
         if echo "$RESULT" | grep -qE "成功|已经签到|ret.*0"; then
           TITLE=" 爱哭签签到成功"
-          BODY="签到结果: ${RESULT}\n时间: $(date '+%Y-%m-%d %H:%M:%S')"
-          LEVEL=""
+          BODY="签到结果: ${RESULT} | 时间: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo " 发送普通推送..."
+          curl -G "https://api.day.app/${BARK_KEY}" \
+            --data-urlencode "title=${TITLE}" \
+            --data-urlencode "body=${BODY}" \
+            --data-urlencode "sound=minimal" \
+            --data-urlencode "group=ikuun-checkin" \
+            --connect-timeout 10 \
+            --max-time 30
         else
           TITLE=" 爱哭签签到失败"
-          BODY="签到结果: ${RESULT}\n时间: $(date '+%Y-%m-%d %H:%M:%S')\n请及时检查！"
-          LEVEL="&level=critical&volume=0"
+          BODY="签到结果: ${RESULT} | 时间: $(date '+%Y-%m-%d %H:%M:%S') | 请及时检查！"
+          echo " 发送紧急推送 (critical, 静音)..."
+          curl -G "https://api.day.app/${BARK_KEY}" \
+            --data-urlencode "title=${TITLE}" \
+            --data-urlencode "body=${BODY}" \
+            --data-urlencode "sound=minimal" \
+            --data-urlencode "group=ikuun-checkin" \
+            --data-urlencode "level=critical" \
+            --data-urlencode "volume=0" \
+            --connect-timeout 10 \
+            --max-time 30
         fi
-        
-        # 发送 Bark 推送
-        echo " 发送 Bark 推送..."
-        curl -X GET "https://api.day.app/${BARK_KEY}?title=${TITLE}&body=${BODY}${LEVEL}&sound=minimal&group=ikuun-checkin" \
-          --connect-timeout 10 \
-          --max-time 30
         echo ""
         echo " Bark 推送完成"
-    - name: Commit # 上传日志到仓库
+    - name: Commit
       env:
        NAME: ikuuu
        EMAIL: 1015350043@qq.com
