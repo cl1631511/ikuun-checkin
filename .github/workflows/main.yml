@@ -71,12 +71,12 @@ jobs:
             msg="${{ steps.signin.outputs.msg }}"
 
             if [ "$ret" = "0" ]; then
-              TITLE="✅ iKuuu签到成功"
-              BODY="${msg} $(date '+%m-%d %H:%M')"
+              TITLE="iKuuu签到成功"
+              BODY="✅ ${msg} $(date '+%m-%d %H:%M')"
               EXTRA=""
             else
-              TITLE="❌ iKuuu签到失败"
-              BODY="${msg} 请及时检查！"
+              TITLE="iKuuu签到失败"
+              BODY="❌ ${msg} 请及时检查！"
               EXTRA="?level=critical&volume=0"
             fi
           fi
