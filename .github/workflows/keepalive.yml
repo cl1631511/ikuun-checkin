@@ -1,0 +1,43 @@
+name: Keepalive
+
+on:
+  schedule:
+    # 每周一凌晨 2:00 运行
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update keepalive timestamp
+        run: |
+          echo "🔄 Keepalive 运行时间: $(date '+%Y-%m-%d %H:%M:%S UTC')" > .github/KEEPALIVE.md
+          echo "" >> .github/KEEPALIVE.md
+          echo "此文件用于保持仓库活跃，防止 GitHub Actions 定时任务被禁用。" >> .github/KEEPALIVE.md
+          echo "" >> .github/KEEPALIVE.md
+          echo "---" >> .github/KEEPALIVE.md
+          echo "*自动由 Keepalive workflow 更新*" >> .github/KEEPALIVE.md
+
+      - name: Commit and push
+        run: |
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          git add .github/KEEPALIVE.md
+
+          if git diff --staged --quiet; then
+            echo "ℹ️ 无变更，跳过提交"
+          else
+            git commit -m "chore: keepalive at $(date '+%Y-%m-%d')"
+            git push
+            echo "✅ Keepalive 提交成功"
+          fi
