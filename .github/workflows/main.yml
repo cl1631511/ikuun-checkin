@@ -2,14 +2,17 @@ name: 'kunkun Checkin Action'
 
 on:
   schedule:
-    - cron: '16 16 * * *'
+    - cron: '0 16 * * *'
   workflow_dispatch:
 
 jobs:
   checking:
     runs-on: ubuntu-latest
     env:
+      # 主域名
       DOMAIN: https://ikuuu.foo
+      # 备用域名（用空格或逗号分隔）
+      BACKUP_DOMAINS: "https://ikuuu.bar https://ikuuu.win"
 
     steps:
       - name: Setup timezone
@@ -39,6 +42,8 @@ jobs:
         env:
           EMAIL: ${{ secrets.EMAIL }}
           PASSWORD: ${{ secrets.PASSWORD }}
+          DOMAIN: ${{ env.DOMAIN }}
+          BACKUP_DOMAINS: ${{ env.BACKUP_DOMAINS }}
         run: |
           xvfb-run --auto-servernum node login.js
 
@@ -56,7 +61,6 @@ jobs:
         env:
           BARK_KEY: ${{ secrets.BARK_KEY }}
         run: |
-          # URL 编码函数
           urlencode() {
             echo "$1" | sed 's/ /%20/g;s/！/%EF%BC%81/g;s/？/%EF%BC%9F/g;s/，/%EF%BC%8C/g;s/：/%EF%BC%9A/g;s/；/%EF%BC%9B/g;s/“/%E2%80%9C/g;s/”/%E2%80%9D/g'
           }
@@ -80,7 +84,6 @@ jobs:
             fi
           fi
 
-          # URL 编码标题和内容
           ENCODED_TITLE=$(urlencode "$TITLE")
           ENCODED_BODY=$(urlencode "$BODY")
 
