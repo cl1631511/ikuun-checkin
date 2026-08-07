@@ -73,7 +73,8 @@ jobs:
             ret="${{ steps.signin.outputs.ret }}"
             msg="${{ steps.signin.outputs.msg }}"
 
-            if [ "$ret" = "1" ]; then
+            # 签到成功条件：ret=1 或 msg包含"签到过"/"已签到"
+            if [ "$ret" = "1" ] || [[ "$msg" == *"签到过"* ]] || [[ "$msg" == *"已签到"* ]]; then
               TITLE="iKuuu签到成功"
               BODY="✅ ${msg} $(date '+%m-%d %H:%M')"
               EXTRA=""
