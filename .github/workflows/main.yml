@@ -73,7 +73,7 @@ jobs:
             ret="${{ steps.signin.outputs.ret }}"
             msg="${{ steps.signin.outputs.msg }}"
 
-            if [ "$ret" = "0" ]; then
+            if [ "$ret" = "1" ]; then
               TITLE="iKuuu签到成功"
               BODY="✅ ${msg} $(date '+%m-%d %H:%M')"
               EXTRA=""
