@@ -2,7 +2,7 @@ name: 'iKuuu Checkin Action'
 
 on:
   schedule:
-    - cron: '55 7 * * *'
+    - cron: '28 19 * * *'   # 北京时间 3:28
   workflow_dispatch:
 
 jobs:
